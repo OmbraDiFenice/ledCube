@@ -1,72 +1,47 @@
-#include <Animations.h>
 #include <Cube.h>
 #include <arduino/ArduinoAnimator.h>
+#include <Animations.h>
 
-#define LED_READY_PIN 11
-#define LED_OUT_PIN 10
-#define CLOCK_PIN 13
+const int clockPin = 13;
+const int dataPin = 10;
+const int outputEnablePin = 11;
 
-#define MIN(a,b) ((((a) < (b))) ? (a) : (b))
-
-const Animator& animator = ArduinoAnimator(LED_READY_PIN, LED_OUT_PIN, CLOCK_PIN);
+const Animator& animator = ArduinoAnimator(outputEnablePin, dataPin, clockPin);
 Cube cube(4);
-Cube cube2(4);
+AnimationRegistry& animations = AnimationRegistry::GetInstance();
+unsigned int animationIndex = 3;
 
-Cube& screenCube = cube;
-Cube& offscreenCube = cube2;
-volatile int readBytes = 0;
-
-void customAnimation(const Painter& painter, Cube& cube) {
-    for(unsigned int z = 0; z < 4; ++z) { 
-        for(unsigned int y = 0; y < 4; ++y) { 
-            for(unsigned int x = 0; x < 4; ++x) { 
-                cube.setPixel(x, y, z, true);
-                painter.paintCube(cube);
-            }
-        }
-    }
-    for(unsigned int z = 4; z > 0; z--) { 
-        for(unsigned int y = 4; y > 0; y--) { 
-            for(unsigned int x = 4; x > 0; x--) { 
-                cube.setPixel(x-1, y-1, z-1, false);
-                painter.paintCube(cube);
-            }
-        }
-    }
-}
-
-void serialAnimation(const Painter& painter, Cube& cube) {
-    painter.paintCube(screenCube, 50);
-}
-
-void serialEvent() {
-    int availableData = Serial.available();
-    Serial.println();
-    Serial.print("Data ready: ");
-    Serial.println(availableData);
-    for(int i = 0; i < availableData; ++i) {
-        offscreenCube.getBuffer()[readBytes] = (unsigned char)Serial.read();
-        ++readBytes;
-        Serial.print(offscreenCube.getBuffer()[readBytes], HEX);
-        Serial.print(" ");
-        if(readBytes == offscreenCube.getSize()) {
-            Serial.println();
-            Serial.println("switching cube");
-            Cube& tmp = screenCube;
-            screenCube = offscreenCube;
-            offscreenCube = tmp;
-            readBytes = 0;
-        }
-    }
-}
+class Remote : public Animation {
+    public:
+        Remote() : Animation("remote") {}; 
+        void run(const Painter& painter, Cube& cube) override {
+            Serial.readBytes(cube.getBuffer(), cube.getSize());
+            painter.paintCube(cube, 50);
+        };
+};
 
 void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
-  while(Serial.available() > 0) Serial.read();
+    Serial.begin(9600);
+
+    digitalWrite(outputEnablePin, LOW);
+    digitalWrite(clockPin, LOW);
+
+    shiftOut(dataPin, clockPin, MSBFIRST, 0x00);
+    shiftOut(dataPin, clockPin, MSBFIRST, 0x00);
+    shiftOut(dataPin, clockPin, MSBFIRST, 0x00);
+
+    digitalWrite(outputEnablePin, HIGH);
+    digitalWrite(outputEnablePin, LOW);
+
+    Serial.println("available animations:");
+    Serial.println(animations.toString().get());
 }
 
 void loop() {
-  animator.play(serialAnimation, cube);
+    animator.play(*animations.getById(animationIndex), cube);
+    if(Serial.available()) {
+        //animationIndex = (animationIndex + 1) % animations.size();
+        animationIndex = (unsigned int) (Serial.parseInt() % animations.size());
+        animations.getById(animationIndex)->init(cube);
+    }
 }
-
