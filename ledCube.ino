@@ -42,6 +42,8 @@ void setup() {
 
     Serial.println("available animations:");
     Serial.println(animations.toString().get());
+
+    animations.getById(animationIndex)->init(cube);
 }
 
 void loop() {
