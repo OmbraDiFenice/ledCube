@@ -30,15 +30,7 @@ void setup() {
     }, FALLING);
     // end setup button interrupt
 
-    digitalWrite(outputEnablePin, LOW);
-    digitalWrite(clockPin, LOW);
-
-    shiftOut(dataPin, clockPin, MSBFIRST, 0x00);
-    shiftOut(dataPin, clockPin, MSBFIRST, 0x00);
-    shiftOut(dataPin, clockPin, MSBFIRST, 0x00);
-
-    digitalWrite(outputEnablePin, HIGH);
-    digitalWrite(outputEnablePin, LOW);
+    animator.init(cube);
 
     Serial.println("available animations:");
     Serial.println(animations.toString().get());
